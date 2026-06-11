@@ -1,3 +1,4 @@
 rootProject.name = 'docker-host-java'
 
 include 'docker-host-core'
+include 'docker-host-api'
