@@ -1,4 +1,4 @@
-package com.github.dockerhostjava.host;
+package com.github.dockerhostjava.models.host;
 
 import java.util.List;
 import java.util.Optional;
@@ -13,7 +13,6 @@ public interface DockerHost {
     Optional<?> findContainersByContainerId(String containerId);
 
     // 이미지 관련
-    Optional<?> findImageOfContainer(String containerId);
     Optional<List<?>> findImages();
 
 }
