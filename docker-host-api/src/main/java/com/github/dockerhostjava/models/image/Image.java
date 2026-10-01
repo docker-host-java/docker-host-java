@@ -4,6 +4,7 @@ import com.github.dockerhostjava.models.shared.ImageRef;
 
 import java.io.OutputStream;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 
 public interface Image {
@@ -18,7 +19,9 @@ public interface Image {
     Instant createdAt();
 //    <?> platform();      // os / arch / variant
 //    <?> config();        // Env, Cmd, Entrypoint, ExposedPorts, Labels
-    // 객체를 구성하든 현재 개발에서 재외하든 둘 중 하나는 정해야 할 둣
+
+    // 조회 (스냅샷 아님)
+    List<ImageHistory> history();
 
     // 상태 변경
     void tag(ImageRef ref);
