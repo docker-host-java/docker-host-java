@@ -33,8 +33,7 @@ public interface Image {
     // 컨태이너
 //    Container create(); // 생성
 //    Container run();    // 생성 + 동작
-    // 잠시 Container가 정의 될 떄까지 주석처리함.
-    // <T> T run()으로 두둘까도 고민했지만, 그럼 나중에 Container run()으로 바꾸는 순간 그 사이 작성된 모든 호출부가 캐스팅 코드를 달고 있게 됨.
+    // Image 책임이 아님
 
     void saveTo(OutputStream out);
 
