@@ -9,7 +9,7 @@ import java.util.Set;
 
 public interface Image {
 
-    // 정체성
+    // 구분자
     String id();                 // sha256:... content-addressed
     Set<ImageRef> tags();        // RepoTags
     Set<ImageRef> digests();     // RepoDigests
