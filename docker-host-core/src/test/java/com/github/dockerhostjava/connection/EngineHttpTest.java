@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -46,6 +47,18 @@ class EngineHttpTest {
                     IllegalStateException.class,
                     () -> EngineHttp.connect(connection(server)));
             assertTrue(error.getMessage().contains("status=500"));
+        } finally {
+            server.stop(0);
+        }
+    }
+
+    @Test
+    void commandPassesTheStringAfterConnect() throws IOException {
+        HttpServer server = server("/_ping", 200, "OK");
+        server.start();
+        try {
+            EngineHttp http = EngineHttp.command(connection(server), "echo hello");
+            assertEquals("echo hello", http.commandText());
         } finally {
             server.stop(0);
         }

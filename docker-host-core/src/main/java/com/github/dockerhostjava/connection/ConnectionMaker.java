@@ -1,6 +1,5 @@
 package com.github.dockerhostjava.connection;
 
-import java.nio.file.Path;
 import java.time.Duration;
 
 public class ConnectionMaker {
@@ -8,7 +7,7 @@ public class ConnectionMaker {
     private String host;
     private int port;
     private boolean tlsVerify;
-    private Path certPath;
+    private TlsCerts tlsCerts;
     private Duration connectTimeout = Duration.ofSeconds(3);
 
 
@@ -29,8 +28,8 @@ public class ConnectionMaker {
         return this;
     }
 
-    public ConnectionMaker certPath(Path certPath) {
-        this.certPath = certPath;
+    public ConnectionMaker tlsCerts(TlsCerts tlsCerts) {
+        this.tlsCerts = tlsCerts;
         return this;
     }
 
@@ -44,9 +43,8 @@ public class ConnectionMaker {
         return protocol + host + ":" + port;
     }
 
-    // to readable EngineHttp
-    Path certPath() {
-        return certPath;
+    TlsCerts tlsCerts() {
+        return tlsCerts;
     }
 
     // to readable EngineHttp

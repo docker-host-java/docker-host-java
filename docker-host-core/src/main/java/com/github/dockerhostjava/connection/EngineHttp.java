@@ -5,18 +5,18 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.file.Path;
 import java.time.Duration;
 
 public class EngineHttp {
 
     private final URI address;
-    private final Path certPath;
+    private final TlsCerts tlsCerts;
     private final HttpClient client;
+    private String commandText;
 
-    private EngineHttp(URI address, Path certPath, HttpClient client) {
+    private EngineHttp(URI address, TlsCerts tlsCerts, HttpClient client) {
         this.address = address;
-        this.certPath = certPath;
+        this.tlsCerts = tlsCerts;
         this.client = client;
     }
 
@@ -26,10 +26,24 @@ public class EngineHttp {
                 .build();
         EngineHttp engineHttp = new EngineHttp(
                 URI.create(connection.connectAddress()),
-                connection.certPath(),
+                connection.tlsCerts(),
                 client);
         engineHttp.ping(connection.connectTimeout());
         return engineHttp;
+    }
+
+    public static EngineHttp command(ConnectionMaker connection, String command) {
+        // TODO: Refactor to global error handling later
+        if (command == null || command.isBlank()) {
+            throw new IllegalArgumentException("command is empty");
+        }
+        EngineHttp http = connect(connection);
+        http.commandText = command;
+        return http;
+    }
+
+    String commandText() {
+        return commandText;
     }
 
     private void ping(Duration timeout) {
@@ -37,6 +51,7 @@ public class EngineHttp {
                 .timeout(timeout)
                 .GET()
                 .build();
+        // TODO: Refactor to global error handling later
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             String body = response.body() == null ? "" : response.body().trim();
