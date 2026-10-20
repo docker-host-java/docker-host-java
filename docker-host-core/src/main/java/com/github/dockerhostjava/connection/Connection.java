@@ -7,43 +7,46 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-public class EngineHttp {
+public class Connection {
 
-    private final URI address;
-    private final TlsCerts tlsCerts;
-    private final HttpClient client;
+    private boolean tlsVerify;
+    private TlsCerts tlsCerts;
+    private Duration connectTimeout = Duration.ofSeconds(3);
+    private URI address;
+    private HttpClient client;
     private String commandText;
 
-    private EngineHttp(URI address, TlsCerts tlsCerts, HttpClient client) {
-        this.address = address;
+    public Connection tlsVerify(boolean tlsVerify) {
+        this.tlsVerify = tlsVerify;
+        return this;
+    }
+
+    public Connection tlsCerts(TlsCerts tlsCerts) {
         this.tlsCerts = tlsCerts;
-        this.client = client;
+        return this;
     }
 
-    public static EngineHttp connect(ConnectionMaker connection) {
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(connection.connectTimeout())
+    public Connection connectTimeout(Duration connectTimeout) {
+        this.connectTimeout = connectTimeout;
+        return this;
+    }
+
+    public Connection connect(HostObject host) {
+        String protocol = tlsVerify ? "https://" : "http://";
+        this.address = URI.create(protocol + host.host() + ":" + host.port());
+        this.client = HttpClient.newBuilder()
+                .connectTimeout(connectTimeout)
                 .build();
-        EngineHttp engineHttp = new EngineHttp(
-                URI.create(connection.connectAddress()),
-                connection.tlsCerts(),
-                client);
-        engineHttp.ping(connection.connectTimeout());
-        return engineHttp;
+        ping(connectTimeout);
+        return this;
     }
 
-    public static EngineHttp command(ConnectionMaker connection, String command) {
-        // TODO: Refactor to global error handling later
+    public Connection command(String command) {
         if (command == null || command.isBlank()) {
             throw new IllegalArgumentException("command is empty");
         }
-        EngineHttp http = connect(connection);
-        http.commandText = command;
-        return http;
-    }
-
-    String commandText() {
-        return commandText;
+        this.commandText = command;
+        return this;
     }
 
     private void ping(Duration timeout) {
@@ -51,7 +54,6 @@ public class EngineHttp {
                 .timeout(timeout)
                 .GET()
                 .build();
-        // TODO: Refactor to global error handling later
         try {
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
             String body = response.body() == null ? "" : response.body().trim();
@@ -65,5 +67,10 @@ public class EngineHttp {
             Thread.currentThread().interrupt();
             throw new IllegalStateException("ping interrupted", e);
         }
+    }
+
+    // For Test
+    String commandText() {
+        return commandText;
     }
 }

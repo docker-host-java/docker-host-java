@@ -12,15 +12,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-class EngineHttpTest {
+class ConnectionTest {
 
     @Test
     void connectSucceedsWhenPingReturnsOk() throws IOException {
         HttpServer server = server("/_ping", 200, "OK");
         server.start();
         try {
-            EngineHttp engineHttp = EngineHttp.connect(connection(server));
-            assertNotNull(engineHttp);
+            Connection connection = connection().connect(host(server));
+            assertNotNull(connection);
         } finally {
             server.stop(0);
         }
@@ -31,8 +31,8 @@ class EngineHttpTest {
         HttpServer server = server("/_ping", 200, "OK\n");
         server.start();
         try {
-            EngineHttp engineHttp = EngineHttp.connect(connection(server));
-            assertNotNull(engineHttp);
+            Connection connection = connection().connect(host(server));
+            assertNotNull(connection);
         } finally {
             server.stop(0);
         }
@@ -45,7 +45,7 @@ class EngineHttpTest {
         try {
             IllegalStateException error = assertThrows(
                     IllegalStateException.class,
-                    () -> EngineHttp.connect(connection(server)));
+                    () -> connection().connect(host(server)));
             assertTrue(error.getMessage().contains("status=500"));
         } finally {
             server.stop(0);
@@ -57,18 +57,23 @@ class EngineHttpTest {
         HttpServer server = server("/_ping", 200, "OK");
         server.start();
         try {
-            EngineHttp http = EngineHttp.command(connection(server), "echo hello");
-            assertEquals("echo hello", http.commandText());
+            Connection connection = connection().connect(host(server));
+            connection.command("echo hello");
+            assertEquals("echo hello", connection.commandText());
         } finally {
             server.stop(0);
         }
     }
 
-    private static ConnectionMaker connection(HttpServer server) {
-        return new ConnectionMaker()
-                .host("127.0.0.1")
-                .port(server.getAddress().getPort())
+    private static Connection connection() {
+        return new Connection()
                 .tlsVerify(false);
+    }
+
+    private static HostObject host(HttpServer server) {
+        return new HostObject()
+                .host("127.0.0.1")
+                .port(server.getAddress().getPort());
     }
 
     private static HttpServer server(String path, int status, String body) throws IOException {
