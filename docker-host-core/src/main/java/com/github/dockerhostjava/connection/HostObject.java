@@ -7,6 +7,8 @@ import java.util.Optional;
 
 public class HostObject implements DockerHost {
 
+    private final Object connectionLock = new Object();
+    private volatile Connection connection;
     private String host;
     private int port;
 
@@ -20,6 +22,10 @@ public class HostObject implements DockerHost {
         return this;
     }
 
+    public Connection connection() {
+        return connection;
+    }
+
     String host() {
         return host;
     }
@@ -28,14 +34,27 @@ public class HostObject implements DockerHost {
         return port;
     }
 
+    Connection open(Connection candidate) {
+        synchronized (connectionLock) {
+            if (connection != null) {
+                return connection;
+            }
+            candidate.establish(this);
+            connection = candidate;
+            return connection;
+        }
+    }
+
     @Override
     public Optional<Connection> makeConnection(String host, int port) {
-        this.host = host;
-        this.port = port;
-        try {
+        synchronized (connectionLock) {
+            if (connection != null && host.equals(this.host) && port == this.port) {
+                return Optional.of(connection);
+            }
+            this.host = host;
+            this.port = port;
+            connection = null;
             return Optional.of(new Connection().connect(this));
-        } catch (IllegalStateException e) {
-            return Optional.empty();
         }
     }
 
