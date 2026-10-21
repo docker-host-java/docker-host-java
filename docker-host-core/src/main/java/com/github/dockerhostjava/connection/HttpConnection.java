@@ -8,7 +8,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 
-public class Connection {
+public class HttpConnection {
 
     private boolean tlsVerify;
     private TlsCerts tlsCerts;
@@ -17,26 +17,26 @@ public class Connection {
     private HttpClient client;
     private String commandText;
 
-    public Connection tlsVerify(boolean tlsVerify) {
+    public HttpConnection tlsVerify(boolean tlsVerify) {
         this.tlsVerify = tlsVerify;
         return this;
     }
 
-    public Connection tlsCerts(TlsCerts tlsCerts) {
+    public HttpConnection tlsCerts(TlsCerts tlsCerts) {
         this.tlsCerts = tlsCerts;
         return this;
     }
 
-    public Connection connectTimeout(Duration connectTimeout) {
+    public HttpConnection connectTimeout(Duration connectTimeout) {
         this.connectTimeout = connectTimeout;
         return this;
     }
 
-    public Connection connect(HostObject host) {
+    public HttpConnection connect(HttpHostObject host) {
         return host.open(this);
     }
 
-    void establish(HostObject host) {
+    void establish(HttpHostObject host) {
         if (host.host() == null || host.host().isBlank() || host.port() <= 0 || host.port() > 65535) {
             throw new IllegalArgumentException(
                     "host address is incomplete: host=" + host.host() + " port=" + host.port());
@@ -52,7 +52,7 @@ public class Connection {
         ping(connectTimeout);
     }
 
-    public Connection command(String command) {
+    public HttpConnection command(String command) {
         if (command == null || command.isBlank()) {
             throw new IllegalArgumentException("command is empty: uri=" + addressText());
         }

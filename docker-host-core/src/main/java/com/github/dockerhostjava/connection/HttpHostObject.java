@@ -5,24 +5,24 @@ import com.github.dockerhostjava.models.host.DockerHost;
 import java.util.List;
 import java.util.Optional;
 
-public class HostObject implements DockerHost {
+public class HttpHostObject implements DockerHost {
 
     private final Object connectionLock = new Object();
-    private volatile Connection connection;
+    private volatile HttpConnection connection;
     private String host;
     private int port;
 
-    public HostObject host(String host) {
+    public HttpHostObject host(String host) {
         this.host = host;
         return this;
     }
 
-    public HostObject port(int port) {
+    public HttpHostObject port(int port) {
         this.port = port;
         return this;
     }
 
-    public Connection connection() {
+    public HttpConnection connection() {
         return connection;
     }
 
@@ -34,7 +34,7 @@ public class HostObject implements DockerHost {
         return port;
     }
 
-    Connection open(Connection candidate) {
+    HttpConnection open(HttpConnection candidate) {
         synchronized (connectionLock) {
             if (connection != null) {
                 return connection;
@@ -46,7 +46,7 @@ public class HostObject implements DockerHost {
     }
 
     @Override
-    public Optional<Connection> makeConnection(String host, int port) {
+    public Optional<HttpConnection> makeConnection(String host, int port) {
         synchronized (connectionLock) {
             if (connection != null && host.equals(this.host) && port == this.port) {
                 return Optional.of(connection);
@@ -54,7 +54,7 @@ public class HostObject implements DockerHost {
             this.host = host;
             this.port = port;
             connection = null;
-            return Optional.of(new Connection().connect(this));
+            return Optional.of(new HttpConnection().connect(this));
         }
     }
 
