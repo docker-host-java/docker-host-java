@@ -1,5 +1,6 @@
-package com.github.dockerhostjava.connection;
+package com.github.dockerhostjava.host;
 
+import com.github.dockerhostjava.connection.HttpConnection;
 import com.github.dockerhostjava.models.host.DockerHost;
 
 import java.util.List;
@@ -26,15 +27,15 @@ public class HttpHostObject implements DockerHost {
         return connection;
     }
 
-    String host() {
+    public String host() {
         return host;
     }
 
-    int port() {
+    public int port() {
         return port;
     }
 
-    HttpConnection open(HttpConnection candidate) {
+    public HttpConnection open(HttpConnection candidate) {
         synchronized (connectionLock) {
             if (connection != null) {
                 return connection;
@@ -45,7 +46,6 @@ public class HttpHostObject implements DockerHost {
         }
     }
 
-    @Override
     public Optional<HttpConnection> makeConnection(String host, int port) {
         synchronized (connectionLock) {
             if (connection != null && host.equals(this.host) && port == this.port) {
@@ -56,6 +56,12 @@ public class HttpHostObject implements DockerHost {
             connection = null;
             return Optional.of(new HttpConnection().connect(this));
         }
+    }
+
+    @Override
+    public Optional<?> command(List<String> commands) {
+        HttpConnection.sendCommand(commands);
+        return Optional.empty();
     }
 
     @Override

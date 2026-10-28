@@ -13,17 +13,17 @@ public class SshHostObject implements DockerHost {
     private String host;
     private int port = 22;
 
-    public SshHostObject user(String user) {
+    public TlsCerts.SshHostObject user(String user) {
         this.user = user;
         return this;
     }
 
-    public SshHostObject host(String host) {
+    public TlsCerts.SshHostObject host(String host) {
         this.host = host;
         return this;
     }
 
-    public SshHostObject port(int port) {
+    public TlsCerts.SshHostObject port(int port) {
         this.port = port;
         return this;
     }
