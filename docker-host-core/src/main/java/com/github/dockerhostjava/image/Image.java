@@ -12,6 +12,8 @@ public class Image {
     List<String> repoTags;
     List<String> repoDigests;
 
+    // 스냅샷 정보는 일일히 요청 -> 불일치 방지
+
     @Override
     public int hashCode() {
         return id.hashCode();
