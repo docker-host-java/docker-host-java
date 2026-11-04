@@ -6,7 +6,7 @@ import java.util.Optional;
 public interface DockerHost {
 
     // 호스트 연결
-    Optional<?> makeConnection(String host, int port);
+    Optional<?> command(List<String> commands);
 
     // 컨테이너 관련
     Optional<?> findContainersByName(String name);

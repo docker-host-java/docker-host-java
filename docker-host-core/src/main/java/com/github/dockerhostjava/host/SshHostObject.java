@@ -1,5 +1,6 @@
-package com.github.dockerhostjava.connection;
+package com.github.dockerhostjava.host;
 
+import com.github.dockerhostjava.connection.SshConnection;
 import com.github.dockerhostjava.models.host.DockerHost;
 
 import java.util.List;
@@ -13,38 +14,46 @@ public class SshHostObject implements DockerHost {
     private String host;
     private int port = 22;
 
-    public TlsCerts.SshHostObject user(String user) {
+    /** SSH 로그인 계정을 저장한다. */
+    public SshHostObject user(String user) {
         this.user = user;
         return this;
     }
 
-    public TlsCerts.SshHostObject host(String host) {
+    /** SSH 호스트 이름을 저장한다. */
+    public SshHostObject host(String host) {
         this.host = host;
         return this;
     }
 
-    public TlsCerts.SshHostObject port(int port) {
+    /** SSH 포트를 저장한다. */
+    public SshHostObject port(int port) {
         this.port = port;
         return this;
     }
 
+    /** 열려 있는 SSH 연결을 반환한다. */
     public SshConnection connection() {
         return connection;
     }
 
-    String user() {
+    /** 저장된 로그인 계정을 반환한다. */
+    public String user() {
         return user;
     }
 
-    String host() {
+    /** 저장된 호스트 이름을 반환한다. */
+    public String host() {
         return host;
     }
 
-    int port() {
+    /** 저장된 포트를 반환한다. */
+    public int port() {
         return port;
     }
 
-    SshConnection open(SshConnection candidate) {
+    /** 연결이 없으면 후보를 붙이고, 있으면 기존 연결을 반환한다. */
+    public SshConnection open(SshConnection candidate) {
         synchronized (connectionLock) {
             if (connection != null) {
                 return connection;
@@ -55,7 +64,7 @@ public class SshHostObject implements DockerHost {
         }
     }
 
-    @Override
+    /** 같은 주소면 기존 연결을 반환하고, 다르면 인증을 유지한 채 다시 연결한다. */
     public Optional<SshConnection> makeConnection(String host, int port) {
         synchronized (connectionLock) {
             if (connection != null && host.equals(this.host) && port == this.port) {
@@ -73,16 +82,25 @@ public class SshHostObject implements DockerHost {
         }
     }
 
+    /** CLI 명령 목록을 이 SSH 호스트의 엔진으로 보낸다. */
+    @Override
+    public Optional<?> command(List<String> commands) {
+        return Optional.empty();
+    }
+
+    /** 이름으로 컨테이너를 찾는다. */
     @Override
     public Optional<?> findContainersByName(String name) {
         return Optional.empty();
     }
 
+    /** 컨테이너 id로 컨테이너를 찾는다. */
     @Override
     public Optional<?> findContainersByContainerId(String containerId) {
         return Optional.empty();
     }
 
+    /** 엔진의 이미지 목록을 조회한다. */
     @Override
     public Optional<List<?>> findImages() {
         return Optional.empty();

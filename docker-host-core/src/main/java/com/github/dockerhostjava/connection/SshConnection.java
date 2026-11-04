@@ -1,5 +1,6 @@
 package com.github.dockerhostjava.connection;
 
+import com.github.dockerhostjava.host.SshHostObject;
 import org.apache.sshd.client.SshClient;
 import org.apache.sshd.client.config.hosts.KnownHostEntry;
 import org.apache.sshd.client.keyverifier.KnownHostsServerKeyVerifier;
@@ -25,6 +26,11 @@ import java.util.concurrent.TimeUnit;
 
 public class SshConnection implements AutoCloseable {
 
+    public enum Auth {
+        PASSWORD,
+        KEY_FILE
+    }
+
     public enum HostKeyChecking {
         ASK,
         ACCEPT_NEW,
@@ -33,7 +39,8 @@ public class SshConnection implements AutoCloseable {
 
     private static final long TIMEOUT_MILLIS = 10_000L;
 
-    private Path identity;
+    private Auth auth;
+    private Path keyFilePath;
     private char[] password;
     private char[] passphrase;
     private Path knownHosts;
@@ -41,11 +48,22 @@ public class SshConnection implements AutoCloseable {
     private SshClient client;
     private ClientSession session;
 
-    public SshConnection identity(Path identity) {
-        this.identity = identity;
+    /** 로그인 방식을 비밀번호 또는 키 파일로 정한다. */
+    public SshConnection auth(Auth auth) {
+        if (auth == null) {
+            throw new IllegalArgumentException("ssh auth method is missing");
+        }
+        this.auth = auth;
         return this;
     }
 
+    /** SSH 비밀키 파일 경로를 저장한다. */
+    public SshConnection keyFilePath(Path keyFilePath) {
+        this.keyFilePath = keyFilePath;
+        return this;
+    }
+
+    /** 로그인 비밀번호를 복사해 저장한다. */
     public SshConnection password(char[] password) {
         if (this.password != null) {
             Arrays.fill(this.password, '\0');
@@ -54,6 +72,7 @@ public class SshConnection implements AutoCloseable {
         return this;
     }
 
+    /** 비밀키 파일을 푸는 암호를 복사해 저장한다. */
     public SshConnection passphrase(char[] passphrase) {
         if (this.passphrase != null) {
             Arrays.fill(this.passphrase, '\0');
@@ -62,11 +81,13 @@ public class SshConnection implements AutoCloseable {
         return this;
     }
 
+    /** 호스트 키를 기록할 known_hosts 경로를 저장한다. */
     public SshConnection knownHosts(Path knownHosts) {
         this.knownHosts = knownHosts;
         return this;
     }
 
+    /** 처음 보는 서버 키를 어떻게 받을지 정한다. */
     public SshConnection hostKeyChecking(HostKeyChecking hostKeyChecking) {
         if (hostKeyChecking == null) {
             throw new IllegalArgumentException("ssh host key checking is missing");
@@ -75,11 +96,13 @@ public class SshConnection implements AutoCloseable {
         return this;
     }
 
+    /** 이 연결을 SSH 호스트에 연다. */
     public SshConnection connect(SshHostObject host) {
         return host.open(this);
     }
 
-    void establish(SshHostObject host) {
+    /** 주소와 인증 조합을 검사한 뒤 SSH 세션을 연다. */
+    public void establish(SshHostObject host) {
         if (host.user() == null || host.user().isBlank()
                 || host.host() == null || host.host().isBlank()
                 || host.port() <= 0 || host.port() > 65535) {
@@ -88,27 +111,39 @@ public class SshConnection implements AutoCloseable {
                             + " host=" + host.host()
                             + " port=" + host.port());
         }
-        if (identity != null && password != null) {
-            throw new IllegalStateException("ssh auth is ambiguous: identity and password are both set");
-        }
-        if (passphrase != null && identity == null) {
-            throw new IllegalStateException("ssh passphrase requires an identity");
-        }
-        if (identity == null && password == null) {
-            throw new IllegalStateException("ssh auth is missing: identity or password is required");
+        if (auth == null) {
+            throw new IllegalStateException("ssh auth method is missing: password or key file");
         }
         KeyPair keyPair = null;
-        if (identity != null) {
-            if (!Files.isRegularFile(identity)) {
-                throw new IllegalStateException("ssh identity file is missing: path=" + identity);
+        if (auth == Auth.PASSWORD) {
+            if (keyFilePath != null || passphrase != null) {
+                throw new IllegalStateException("ssh key file is set for password auth");
             }
-            keyPair = loadIdentity();
-        } else if (password.length == 0) {
-            throw new IllegalStateException("ssh password is empty");
+            if (password == null) {
+                throw new IllegalStateException("ssh password is missing");
+            }
+            if (password.length == 0) {
+                throw new IllegalStateException("ssh password is empty");
+            }
+        } else {
+            if (password != null) {
+                throw new IllegalStateException("ssh password is set for key file auth");
+            }
+            if (passphrase != null && keyFilePath == null) {
+                throw new IllegalStateException("ssh passphrase requires a key file");
+            }
+            if (keyFilePath == null) {
+                throw new IllegalStateException("ssh key file is missing");
+            }
+            if (!Files.isRegularFile(keyFilePath)) {
+                throw new IllegalStateException("ssh key file is missing: path=" + keyFilePath);
+            }
+            keyPair = loadKeyFile();
         }
         authenticate(host, keyPair);
     }
 
+    /** SSH 세션을 닫고 비밀번호 배열을 지운다. */
     @Override
     public void close() {
         ClientSession openSession = session;
@@ -135,9 +170,11 @@ public class SshConnection implements AutoCloseable {
         passphrase = null;
     }
 
-    SshConnection withSameAuth() {
+    /** 같은 인증 값을 가진 새 연결을 만든다. */
+    public SshConnection withSameAuth() {
         SshConnection copy = new SshConnection();
-        copy.identity = identity;
+        copy.auth = auth;
+        copy.keyFilePath = keyFilePath;
         copy.password = password == null ? null : password.clone();
         copy.passphrase = passphrase == null ? null : passphrase.clone();
         copy.knownHosts = knownHosts;
@@ -145,31 +182,35 @@ public class SshConnection implements AutoCloseable {
         return copy;
     }
 
-    Path identity() {
-        return identity;
+    /** 저장된 비밀키 파일 경로를 반환한다. */
+    Path keyFilePath() {
+        return keyFilePath;
     }
 
+    /** 저장된 로그인 비밀번호를 반환한다. */
     char[] password() {
         return password;
     }
 
+    /** 인증이 끝난 세션이 있는지 반환한다. */
     boolean connected() {
         return session != null && session.isAuthenticated();
     }
 
-    private KeyPair loadIdentity() {
+    /** 비밀키 파일을 읽어 KeyPair로 만든다. */
+    private KeyPair loadKeyFile() {
         FilePasswordProvider provider = passphrase == null
                 ? null
                 : FilePasswordProvider.of(new String(passphrase));
-        try (InputStream input = Files.newInputStream(identity)) {
+        try (InputStream input = Files.newInputStream(keyFilePath)) {
             Iterable<KeyPair> keys = SecurityUtils.loadKeyPairIdentities(
-                    null, new PathResource(identity), input, provider);
+                    null, new PathResource(keyFilePath), input, provider);
             if (keys == null) {
-                throw new IllegalStateException("ssh identity could not be loaded: path=" + identity);
+                throw new IllegalStateException("ssh key file could not be loaded: path=" + keyFilePath);
             }
             Iterator<KeyPair> iterator = keys.iterator();
             if (!iterator.hasNext()) {
-                throw new IllegalStateException("ssh identity could not be loaded: path=" + identity);
+                throw new IllegalStateException("ssh key file could not be loaded: path=" + keyFilePath);
             }
             return iterator.next();
         } catch (IllegalStateException e) {
@@ -177,15 +218,16 @@ public class SshConnection implements AutoCloseable {
         } catch (GeneralSecurityException | IOException e) {
             if (passphrase == null && e instanceof FailedLoginException) {
                 throw new IllegalStateException(
-                        "ssh identity passphrase is missing: path=" + identity, e);
+                        "ssh key file passphrase is missing: path=" + keyFilePath, e);
             }
             throw new IllegalStateException(
-                    "ssh identity could not be loaded: path=" + identity
+                    "ssh key file could not be loaded: path=" + keyFilePath
                             + " error=" + e.getClass().getSimpleName(),
                     e);
         }
     }
 
+    /** 키 또는 비밀번호로 SSH 인증을 끝낸다. */
     private void authenticate(SshHostObject host, KeyPair keyPair) {
         SshClient opening = SshClient.setUpDefaultClient();
         opening.setKeyIdentityProvider(KeyIdentityProvider.EMPTY_KEYS_PROVIDER);
@@ -224,6 +266,7 @@ public class SshConnection implements AutoCloseable {
         }
     }
 
+    /** 호스트 키 정책에 맞는 서버 키 검사기를 만든다. */
     private ServerKeyVerifier serverKeyVerifier(SshHostObject host) {
         if (knownHosts == null) {
             if (hostKeyChecking == HostKeyChecking.ACCEPT_NEW) {
@@ -236,7 +279,8 @@ public class SshConnection implements AutoCloseable {
         return new HostKeyVerifier(host, knownHosts, hostKeyChecking);
     }
 
-    private IllegalStateException authFailed(SshHostObject host, boolean identityAuth, Throwable error) {
+    /** 인증 실패를 계정과 주소만 담은 예외로 바꾼다. */
+    private IllegalStateException authFailed(SshHostObject host, boolean keyFileAuth, Throwable error) {
         IllegalStateException hostKey = hostKeyFailure(error);
         if (hostKey != null) {
             return hostKey;
@@ -245,11 +289,12 @@ public class SshConnection implements AutoCloseable {
                 "ssh auth failed: user=" + host.user()
                         + " host=" + host.host()
                         + " port=" + host.port()
-                        + " auth=" + (identityAuth ? "identity" : "password")
+                        + " auth=" + (keyFileAuth ? "keyFile" : "password")
                         + " error=" + error.getClass().getSimpleName(),
                 error);
     }
 
+    /** 원인 연쇄에서 호스트 키 거절 예외를 찾는다. */
     private static IllegalStateException hostKeyFailure(Throwable error) {
         Throwable current = error;
         for (int depth = 0; current != null && depth < 20; depth++) {
@@ -263,10 +308,12 @@ public class SshConnection implements AutoCloseable {
         return null;
     }
 
+    /** 호스트 키 거절 예외를 만든다. */
     private IllegalStateException hostKeyRejected(SshHostObject host, boolean modified) {
         return hostKeyRejected(host.user(), host.host(), host.port(), hostKeyChecking, modified);
     }
 
+    /** 확인이 필요한 키와 거절된 키의 예외 문구를 만든다. */
     private static IllegalStateException hostKeyRejected(
             String user, String host, int port, HostKeyChecking checking, boolean modified) {
         if (checking == HostKeyChecking.ASK && !modified) {
@@ -283,6 +330,7 @@ public class SshConnection implements AutoCloseable {
                         + " checking=" + checking);
     }
 
+    /** 문자 배열을 0으로 덮어 지운다. */
     private static void wipe(char[] value) {
         if (value != null) {
             Arrays.fill(value, '\0');
@@ -297,6 +345,7 @@ public class SshConnection implements AutoCloseable {
         private final int port;
         private boolean modified;
 
+        /** known_hosts 파일과 호스트 키 정책을 보관한다. */
         private HostKeyVerifier(SshHostObject host, Path knownHosts, HostKeyChecking checking) {
             super((session, remote, key) -> true, knownHosts);
             this.checking = checking;
@@ -305,6 +354,7 @@ public class SshConnection implements AutoCloseable {
             this.port = host.port();
         }
 
+        /** 서버 키가 정책에 맞지 않으면 예외를 던진다. */
         @Override
         public boolean verifyServerKey(ClientSession clientSession, SocketAddress remoteAddress, PublicKey serverKey) {
             modified = false;
@@ -314,6 +364,7 @@ public class SshConnection implements AutoCloseable {
             return true;
         }
 
+        /** ACCEPT_NEW일 때만 처음 보는 키를 known_hosts에 저장한다. */
         @Override
         protected boolean acceptUnknownHostKey(
                 ClientSession clientSession, SocketAddress remoteAddress, PublicKey serverKey) {
@@ -323,6 +374,7 @@ public class SshConnection implements AutoCloseable {
             return false;
         }
 
+        /** 저장된 키와 다른 서버 키는 거절한다. */
         @Override
         public boolean acceptModifiedServerKey(
                 ClientSession clientSession,

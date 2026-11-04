@@ -25,33 +25,40 @@ public class TlsCerts {
     private Path certPem;
     private Path keyPem;
 
+    /** CA 인증서 경로를 저장한다. */
     public TlsCerts caPem(Path caPem) {
         this.caPem = caPem;
         return this;
     }
 
+    /** 클라이언트 인증서 경로를 저장한다. */
     public TlsCerts certPem(Path certPem) {
         this.certPem = certPem;
         return this;
     }
 
+    /** 클라이언트 비밀키 경로를 저장한다. */
     public TlsCerts keyPem(Path keyPem) {
         this.keyPem = keyPem;
         return this;
     }
 
+    /** 저장된 CA 인증서 경로를 반환한다. */
     Path caPem() {
         return caPem;
     }
 
+    /** 저장된 클라이언트 인증서 경로를 반환한다. */
     Path certPem() {
         return certPem;
     }
 
+    /** 저장된 클라이언트 비밀키 경로를 반환한다. */
     Path keyPem() {
         return keyPem;
     }
 
+    /** CA, 인증서, 비밀키로 SSLContext를 만든다. */
     SSLContext sslContext() {
         validateFile(caPem, "ca.pem");
         validateFile(certPem, "cert.pem");
@@ -90,7 +97,7 @@ public class TlsCerts {
         }
     }
 
-    // 경로가 비었거나 파일이 아니면 예외
+    /** 경로가 비었거나 파일이 아니면 예외를 던진다. */
     private static void validateFile(Path path, String name) {
         if (path == null) {
             throw new IllegalStateException("tls cert is missing: " + name);
@@ -100,7 +107,7 @@ public class TlsCerts {
         }
     }
 
-    // PEM 인증서를 X509Certificate로 읽는다
+    /** PEM 인증서를 X509Certificate로 읽는다. */
     private static X509Certificate readCertificate(Path path) throws CertificateException, IOException {
         CertificateFactory factory = CertificateFactory.getInstance("X.509");
         try (InputStream input = Files.newInputStream(path)) {
@@ -108,7 +115,7 @@ public class TlsCerts {
         }
     }
 
-    // PEM 개인키를 PrivateKey로 읽는다. PKCS#8 또는 PKCS#1 RSA
+    /** PEM 개인키를 읽는다. PKCS#8 또는 PKCS#1 RSA만 받는다. */
     private static PrivateKey readPrivateKey(Path path) throws GeneralSecurityException, IOException {
         String pem = Files.readString(path);
         if (pem.contains("ENCRYPTED")) {
@@ -125,7 +132,7 @@ public class TlsCerts {
                         + " expected PKCS#8 PRIVATE KEY or PKCS#1 RSA PRIVATE KEY");
     }
 
-    // PKCS#8 바이트를 RSA 또는 EC PrivateKey로 만든다
+    /** PKCS#8 바이트를 RSA 또는 EC PrivateKey로 만든다. */
     private static PrivateKey pkcs8(byte[] encoded) throws GeneralSecurityException {
         PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(encoded);
         try {
@@ -135,7 +142,7 @@ public class TlsCerts {
         }
     }
 
-    // PEM 헤더 사이 Base64를 바이트로 푼다
+    /** PEM 헤더 사이 Base64를 바이트로 푼다. */
     private static byte[] pemBytes(Path path, String pem, String type) {
         String begin = "-----BEGIN " + type + "-----";
         String end = "-----END " + type + "-----";
@@ -147,7 +154,7 @@ public class TlsCerts {
         return Base64.getMimeDecoder().decode(pem.substring(start + begin.length(), stop));
     }
 
-    // PKCS#1 RSA 개인키를 PKCS#8로 감싼다
+    /** PKCS#1 RSA 개인키를 PKCS#8로 감싼다. */
     private static byte[] pkcs1ToPkcs8(byte[] pkcs1) {
         byte[] version = new byte[]{0x02, 0x01, 0x00};
         byte[] algorithm = new byte[]{
@@ -159,7 +166,7 @@ public class TlsCerts {
         return der(0x30, concat(version, algorithm, der(0x04, pkcs1)));
     }
 
-    // tag와 값을 DER 한 덩어리로 붙인다
+    /** tag와 값을 DER 한 덩어리로 붙인다. */
     private static byte[] der(int tag, byte[] value) {
         byte[] length = derLength(value.length);
         byte[] out = new byte[1 + length.length + value.length];
@@ -169,7 +176,7 @@ public class TlsCerts {
         return out;
     }
 
-    // DER 길이 필드를 만든다
+    /** DER 길이 필드를 만든다. */
     private static byte[] derLength(int length) {
         if (length < 128) {
             return new byte[]{(byte) length};
@@ -180,7 +187,7 @@ public class TlsCerts {
         return new byte[]{(byte) 0x82, (byte) (length >> 8), (byte) length};
     }
 
-    // 바이트 배열을 순서대로 이어 붙인다
+    /** 바이트 배열을 순서대로 이어 붙인다. */
     private static byte[] concat(byte[]... parts) {
         int size = 0;
         for (byte[] part : parts) {
