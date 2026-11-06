@@ -1,4 +1,8 @@
 dependencies {
+    api project(':docker-host-api')
+
+    implementation 'org.apache.sshd:sshd-core:2.20.0'
+
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
 }
