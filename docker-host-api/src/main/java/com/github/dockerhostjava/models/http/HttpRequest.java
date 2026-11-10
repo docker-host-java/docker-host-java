@@ -77,7 +77,6 @@ import java.util.Map;
 public record HttpRequest(
         HttpMethod method,
         String path,
-        String host,
         Map<String, String> headers,
         byte[] body
 ) {
@@ -88,9 +87,6 @@ public record HttpRequest(
         }
         if (path == null || path.isBlank()) {
             throw new IllegalArgumentException("http request path is missing");
-        }
-        if (host == null || host.isBlank()) {
-            throw new IllegalArgumentException("http request host is missing");
         }
         headers = headers == null ? Map.of() : Map.copyOf(headers);
     }
