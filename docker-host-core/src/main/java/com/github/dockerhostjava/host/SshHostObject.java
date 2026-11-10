@@ -2,6 +2,7 @@ package com.github.dockerhostjava.host;
 
 import com.github.dockerhostjava.connection.SshConnection;
 import com.github.dockerhostjava.models.host.DockerHost;
+import com.github.dockerhostjava.models.http.HttpRequest;
 
 import java.util.List;
 import java.util.Optional;
@@ -82,8 +83,18 @@ public class SshHostObject implements DockerHost {
         }
     }
 
-    /** CLI 명령 목록을 이 SSH 호스트의 엔진으로 보낸다. */
+    /**
+     * HTTP/1.1 요청 하나를 SSH 터널을 통해 원격 Docker Engine으로 보낸다.
+     * 전송 계층 재설계 전까지는 임시 구현이다.
+     */
     @Override
+    public Optional<String> command(HttpRequest request) {
+        throw new UnsupportedOperationException(
+                "command(HttpRequest) is not wired to the transport yet: user=" + user
+                        + " host=" + host + " port=" + port);
+    }
+
+    /** 기존 CLI 명령 목록을 받는 호출 경로. 새 command(HttpRequest)로 이행되면 제거한다. */
     public Optional<?> command(List<String> commands) {
         return Optional.empty();
     }
