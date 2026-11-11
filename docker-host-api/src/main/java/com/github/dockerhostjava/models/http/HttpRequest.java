@@ -8,10 +8,13 @@ import java.util.Map;
  * <ul>
  *   <li>method: 요청 종류 (GET/POST/PUT/DELETE 등)</li>
  *   <li>path: 요청 경로 및 쿼리 스트링 (예: "/containers/json?all=true")</li>
- *   <li>host: Host 헤더 값 (HTTP/1.1 필수 헤더, 예: "127.0.0.1:2375", Unix 소켓이면 "localhost")</li>
  *   <li>headers: 부가 헤더 (Content-Type, Accept 등)</li>
  *   <li>body: 본문 바이트. 없으면 null.</li>
  * </ul>
+ *
+ * <p>HTTP/1.1 필수 헤더인 {@code Host} 값은 전송 계층이 자신이 연결된 대상에 맞게 직렬화 시점에
+ * 주입한다 (TCP/TLS = "host:port", Unix 소켓/Named Pipe = "localhost" 등). 요청 객체 자체는
+ * 어느 호스트로 갈지와 무관하게 재사용 가능하다.
  *
  * <h2>사용 예시</h2>
  *
@@ -20,7 +23,6 @@ import java.util.Map;
  * HttpRequest listContainers = new HttpRequest(
  *         HttpMethod.GET,
  *         "/containers/json",
- *         "127.0.0.1:2375",
  *         Map.of("Accept", "application/json"),
  *         null);
  *
@@ -28,7 +30,6 @@ import java.util.Map;
  * HttpRequest listAll = new HttpRequest(
  *         HttpMethod.GET,
  *         "/containers/json?all=true",
- *         "127.0.0.1:2375",
  *         Map.of(),
  *         null);
  *
@@ -36,7 +37,6 @@ import java.util.Map;
  * HttpRequest start = new HttpRequest(
  *         HttpMethod.POST,
  *         "/containers/abc123/start",
- *         "127.0.0.1:2375",
  *         Map.of(),
  *         null);
  *
@@ -44,7 +44,6 @@ import java.util.Map;
  * HttpRequest remove = new HttpRequest(
  *         HttpMethod.DELETE,
  *         "/containers/abc123?force=true",
- *         "127.0.0.1:2375",
  *         Map.of(),
  *         null);
  *
@@ -52,7 +51,6 @@ import java.util.Map;
  * HttpRequest pull = new HttpRequest(
  *         HttpMethod.POST,
  *         "/images/create?fromImage=nginx&tag=latest",
- *         "127.0.0.1:2375",
  *         Map.of(),
  *         null);
  *
@@ -63,7 +61,6 @@ import java.util.Map;
  * HttpRequest create = new HttpRequest(
  *         HttpMethod.POST,
  *         "/containers/create",
- *         "127.0.0.1:2375",
  *         Map.of("Content-Type", "application/json"),
  *         body);
  *
@@ -77,7 +74,6 @@ import java.util.Map;
 public record HttpRequest(
         HttpMethod method,
         String path,
-        String host,
         Map<String, String> headers,
         byte[] body
 ) {
@@ -88,9 +84,6 @@ public record HttpRequest(
         }
         if (path == null || path.isBlank()) {
             throw new IllegalArgumentException("http request path is missing");
-        }
-        if (host == null || host.isBlank()) {
-            throw new IllegalArgumentException("http request host is missing");
         }
         headers = headers == null ? Map.of() : Map.copyOf(headers);
     }
