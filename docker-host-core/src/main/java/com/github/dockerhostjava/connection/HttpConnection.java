@@ -17,7 +17,7 @@ import static com.github.dockerhostjava.connection.DockerCli.EngineCall;
 
 public class HttpConnection {
 
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(3);
+    static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(3);
 
     private final boolean tls;
     private final TlsCerts tlsCerts;
@@ -25,36 +25,26 @@ public class HttpConnection {
     private URI address;
     private HttpClient client;
 
-    /** TLS 여부와 인증서는 팩토리에서만 정한다. */
-    private HttpConnection(boolean tls, TlsCerts tlsCerts, Duration connectTimeout) {
+    /** HttpHostObject.connect()가 내부에서 호출한다. 외부에서 직접 생성·구성하지 않는다. */
+    public HttpConnection(boolean tls, TlsCerts tlsCerts, Duration connectTimeout) {
         this.tls = tls;
         this.tlsCerts = tlsCerts;
-        this.connectTimeout = connectTimeout;
+        this.connectTimeout = requirePositive(connectTimeout);
     }
 
-    /** 호스트에 http로 연결한다. */
-    public static HttpConnection connectPlain(HttpHostObject host) {
-        return connectPlain(host, DEFAULT_TIMEOUT);
+    /** 기본 타임아웃으로 생성한다. */
+    public HttpConnection(boolean tls, TlsCerts tlsCerts) {
+        this(tls, tlsCerts, DEFAULT_TIMEOUT);
     }
 
-    /** 호스트에 http로 연결하고 제한 시간을 정한다. */
-    public static HttpConnection connectPlain(HttpHostObject host, Duration connectTimeout) {
-        return new HttpConnection(false, null, timeout(connectTimeout)).connect(host);
+    /** TLS 사용 여부. */
+    public boolean tls() {
+        return tls;
     }
 
-    /** 호스트에 인증서를 붙여 https로 연결한다. */
-    public static HttpConnection connectTls(HttpHostObject host, TlsCerts tlsCerts) {
-        return connectTls(host, tlsCerts, DEFAULT_TIMEOUT);
-    }
-
-    /** 호스트에 인증서를 붙여 https로 연결하고 제한 시간을 정한다. */
-    public static HttpConnection connectTls(HttpHostObject host, TlsCerts tlsCerts, Duration connectTimeout) {
-        if (tlsCerts == null) {
-            throw new IllegalArgumentException(
-                    "tls certs are missing: host=" + host.host() + " port=" + host.port()
-                            + " tls requires ca.pem, cert.pem, and key.pem");
-        }
-        return new HttpConnection(true, tlsCerts, timeout(connectTimeout)).connect(host);
+    /** 저장된 TLS 인증서 묶음(없으면 null). */
+    public TlsCerts tlsCerts() {
+        return tlsCerts;
     }
 
     /** 같은 TLS 설정과 제한 시간을 가진 연결 전 객체를 만든다. */
@@ -62,20 +52,8 @@ public class HttpConnection {
         return new HttpConnection(tls, tlsCerts, connectTimeout);
     }
 
-    /** 이 연결을 호스트에 열고, 이미 다른 TLS 설정으로 연결돼 있으면 예외를 던진다. */
-    private HttpConnection connect(HttpHostObject host) {
-        HttpConnection opened = host.open(this);
-        if (opened.tls != tls || opened.tlsCerts != tlsCerts) {
-            throw new IllegalStateException(
-                    "host is already connected with other tls settings: host=" + host.host()
-                            + " port=" + host.port()
-                            + " tls=" + opened.tls);
-        }
-        return opened;
-    }
-
     /** 제한 시간이 비었거나 0 이하이면 예외를 던진다. */
-    private static Duration timeout(Duration connectTimeout) {
+    private static Duration requirePositive(Duration connectTimeout) {
         if (connectTimeout == null || connectTimeout.isZero() || connectTimeout.isNegative()) {
             throw new IllegalArgumentException("connect timeout must be positive: timeout=" + connectTimeout);
         }

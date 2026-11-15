@@ -94,32 +94,25 @@ public class SshHostObject implements DockerHost {
         if (connection != null) {
             return this;
         }
-        SshConnection candidate = new SshConnection();
-        if (auth != null) {
-            candidate.auth(auth);
-        }
-        if (password != null) {
-            candidate.password(password);
-        }
-        if (keyFilePath != null) {
-            candidate.keyFilePath(keyFilePath);
-        }
-        if (passphrase != null) {
-            candidate.passphrase(passphrase);
-        }
-        if (knownHosts != null) {
-            candidate.knownHosts(knownHosts);
-        }
-        if (hostKeyChecking != null) {
-            candidate.hostKeyChecking(hostKeyChecking);
-        }
-        candidate.connect(this);
+        open(new SshConnection());
         return this;
     }
 
     /** 주소를 바꿔 다시 연결한다. 인증 설정은 유지한다. */
     public Optional<SshConnection> reconnect(String host, int port) {
-        return makeConnection(host, port);
+        synchronized (connectionLock) {
+            if (connection != null && host.equals(this.host) && port == this.port) {
+                return Optional.of(connection);
+            }
+            SshConnection previous = connection;
+            this.host = host;
+            this.port = port;
+            connection = null;
+            if (previous != null) {
+                previous.close();
+            }
+            return Optional.of(open(new SshConnection()));
+        }
     }
 
     /** 열려 있는 SSH 연결을 반환한다. */
@@ -142,6 +135,11 @@ public class SshHostObject implements DockerHost {
         return port;
     }
 
+    /** 저장된 인증 방식을 반환한다. */
+    public SshConnection.Auth auth() {
+        return auth;
+    }
+
     /** 저장된 비밀키 파일 경로를 반환한다. */
     public Path keyFilePath() {
         return keyFilePath;
@@ -150,6 +148,21 @@ public class SshHostObject implements DockerHost {
     /** 저장된 로그인 비밀번호 배열(원본 참조)을 반환한다. */
     public char[] password() {
         return password;
+    }
+
+    /** 저장된 비밀키 파일 암호(원본 참조)를 반환한다. */
+    public char[] passphrase() {
+        return passphrase;
+    }
+
+    /** 저장된 known_hosts 경로를 반환한다. */
+    public Path knownHosts() {
+        return knownHosts;
+    }
+
+    /** 저장된 호스트 키 검사 정책을 반환한다. */
+    public SshConnection.HostKeyChecking hostKeyChecking() {
+        return hostKeyChecking;
     }
 
     /** 연결이 없으면 후보를 붙이고, 있으면 기존 연결을 반환한다. */
@@ -161,24 +174,6 @@ public class SshHostObject implements DockerHost {
             candidate.establish(this);
             connection = candidate;
             return connection;
-        }
-    }
-
-    /** 같은 주소면 기존 연결을 반환하고, 다르면 인증을 유지한 채 다시 연결한다. */
-    public Optional<SshConnection> makeConnection(String host, int port) {
-        synchronized (connectionLock) {
-            if (connection != null && host.equals(this.host) && port == this.port) {
-                return Optional.of(connection);
-            }
-            SshConnection previous = connection;
-            SshConnection next = previous == null ? new SshConnection() : previous.withSameAuth();
-            this.host = host;
-            this.port = port;
-            connection = null;
-            if (previous != null) {
-                previous.close();
-            }
-            return Optional.of(next.connect(this));
         }
     }
 

@@ -48,7 +48,7 @@ class SshConnectionTest {
             host.connect();
             try (SshConnection connection = host.connection()) {
                 assertTrue(connection.connected());
-                assertEquals(key, connection.keyFilePath());
+                assertEquals(key, host.keyFilePath());
                 assertEquals("dkk", host.user());
                 assertEquals("127.0.0.1", host.host());
                 assertEquals(server.getPort(), host.port());
@@ -364,7 +364,7 @@ class SshConnectionTest {
                     assertNotSame(connected, moved);
                     assertTrue(moved.connected());
                     assertEquals("dkk", host.user());
-                    assertEquals(key, moved.keyFilePath());
+                    assertEquals(key, host.keyFilePath());
                     assertEquals(second.getPort(), host.port());
                 }
             } finally {
