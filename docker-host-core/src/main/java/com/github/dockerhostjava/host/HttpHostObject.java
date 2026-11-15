@@ -1,6 +1,7 @@
 package com.github.dockerhostjava.host;
 
 import com.github.dockerhostjava.connection.HttpConnection;
+import com.github.dockerhostjava.connection.TlsCerts;
 import com.github.dockerhostjava.models.host.DockerHost;
 import com.github.dockerhostjava.models.http.HttpRequest;
 
@@ -13,6 +14,7 @@ public class HttpHostObject implements DockerHost {
     private volatile HttpConnection connection;
     private String host;
     private int port;
+    private TlsCerts tlsCerts;
 
     /** 엔진 호스트 이름을 저장한다. */
     public HttpHostObject host(String host) {
@@ -24,6 +26,30 @@ public class HttpHostObject implements DockerHost {
     public HttpHostObject port(int port) {
         this.port = port;
         return this;
+    }
+
+    /** TLS 인증서를 저장한다. null이면 plain http로 연결된다. */
+    public HttpHostObject tlsCerts(TlsCerts tlsCerts) {
+        this.tlsCerts = tlsCerts;
+        return this;
+    }
+
+    /**
+     * 저장된 설정으로 Docker Engine 통로를 연다. 이미 같은 설정으로 열려 있으면 그대로 두고,
+     * 다른 TLS 설정으로 이미 열려 있으면 예외를 던진다.
+     */
+    public HttpHostObject connect() {
+        if (tlsCerts != null) {
+            HttpConnection.connectTls(this, tlsCerts);
+        } else {
+            HttpConnection.connectPlain(this);
+        }
+        return this;
+    }
+
+    /** 주소를 바꿔 다시 연결한다. 같은 TLS 설정을 유지한다. */
+    public Optional<HttpConnection> reconnect(String host, int port) {
+        return makeConnection(host, port);
     }
 
     /** 열려 있는 HTTP 연결을 반환한다. */
