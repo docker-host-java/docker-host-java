@@ -11,17 +11,28 @@ import java.util.Optional;
 
 public class SshHostObject implements DockerHost {
 
+    public enum Auth {
+        PASSWORD,
+        KEY_FILE
+    }
+
+    public enum HostKeyChecking {
+        ASK,
+        ACCEPT_NEW,
+        YES
+    }
+
     private final Object connectionLock = new Object();
     private volatile SshConnection connection;
     private String user;
     private String host;
     private int port = 22;
-    private SshConnection.Auth auth;
+    private Auth auth;
     private char[] password;
     private Path keyFilePath;
     private char[] passphrase;
     private Path knownHosts;
-    private SshConnection.HostKeyChecking hostKeyChecking;
+    private HostKeyChecking hostKeyChecking;
 
     /** SSH 로그인 계정을 저장한다. */
     public SshHostObject user(String user) {
@@ -42,7 +53,7 @@ public class SshHostObject implements DockerHost {
     }
 
     /** 로그인 방식을 비밀번호 또는 키 파일로 정한다. */
-    public SshHostObject auth(SshConnection.Auth auth) {
+    public SshHostObject auth(Auth auth) {
         if (auth == null) {
             throw new IllegalArgumentException("ssh auth method is missing");
         }
@@ -81,7 +92,7 @@ public class SshHostObject implements DockerHost {
     }
 
     /** 처음 보는 서버 키를 어떻게 받을지 정한다. */
-    public SshHostObject hostKeyChecking(SshConnection.HostKeyChecking hostKeyChecking) {
+    public SshHostObject hostKeyChecking(HostKeyChecking hostKeyChecking) {
         if (hostKeyChecking == null) {
             throw new IllegalArgumentException("ssh host key checking is missing");
         }
@@ -136,7 +147,7 @@ public class SshHostObject implements DockerHost {
     }
 
     /** 저장된 인증 방식을 반환한다. */
-    public SshConnection.Auth auth() {
+    public Auth auth() {
         return auth;
     }
 
@@ -161,7 +172,7 @@ public class SshHostObject implements DockerHost {
     }
 
     /** 저장된 호스트 키 검사 정책을 반환한다. */
-    public SshConnection.HostKeyChecking hostKeyChecking() {
+    public HostKeyChecking hostKeyChecking() {
         return hostKeyChecking;
     }
 

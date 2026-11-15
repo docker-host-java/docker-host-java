@@ -25,17 +25,6 @@ import java.util.concurrent.TimeUnit;
 
 public class SshConnection implements AutoCloseable {
 
-    public enum Auth {
-        PASSWORD,
-        KEY_FILE
-    }
-
-    public enum HostKeyChecking {
-        ASK,
-        ACCEPT_NEW,
-        YES
-    }
-
     private static final long TIMEOUT_MILLIS = 10_000L;
 
     private SshClient client;
@@ -55,12 +44,12 @@ public class SshConnection implements AutoCloseable {
                             + " host=" + host.host()
                             + " port=" + host.port());
         }
-        Auth auth = host.auth();
+        SshHostObject.Auth auth = host.auth();
         if (auth == null) {
             throw new IllegalStateException("ssh auth method is missing: password or key file");
         }
         KeyPair keyPair = null;
-        if (auth == Auth.PASSWORD) {
+        if (auth == SshHostObject.Auth.PASSWORD) {
             if (host.keyFilePath() != null || host.passphrase() != null) {
                 throw new IllegalStateException("ssh key file is set for password auth");
             }
@@ -187,9 +176,9 @@ public class SshConnection implements AutoCloseable {
 
     /** 호스트 키 정책에 맞는 서버 키 검사기를 만든다. */
     private static ServerKeyVerifier serverKeyVerifier(SshHostObject host) {
-        HostKeyChecking checking = host.hostKeyChecking() != null ? host.hostKeyChecking() : HostKeyChecking.ACCEPT_NEW;
+        SshHostObject.HostKeyChecking checking = host.hostKeyChecking() != null ? host.hostKeyChecking() : SshHostObject.HostKeyChecking.ACCEPT_NEW;
         if (host.knownHosts() == null) {
-            if (checking == HostKeyChecking.ACCEPT_NEW) {
+            if (checking == SshHostObject.HostKeyChecking.ACCEPT_NEW) {
                 return (session, remote, key) -> true;
             }
             return (session, remote, key) -> {
@@ -230,8 +219,8 @@ public class SshConnection implements AutoCloseable {
 
     /** 확인이 필요한 키와 거절된 키의 예외 문구를 만든다. */
     private static IllegalStateException hostKeyRejected(
-            String user, String host, int port, HostKeyChecking checking, boolean modified) {
-        if (checking == HostKeyChecking.ASK && !modified) {
+            String user, String host, int port, SshHostObject.HostKeyChecking checking, boolean modified) {
+        if (checking == SshHostObject.HostKeyChecking.ASK && !modified) {
             return new IllegalStateException(
                     "ssh host key confirmation is required: user=" + user
                             + " host=" + host
@@ -247,14 +236,14 @@ public class SshConnection implements AutoCloseable {
 
     private static final class HostKeyVerifier extends KnownHostsServerKeyVerifier {
 
-        private final HostKeyChecking checking;
+        private final SshHostObject.HostKeyChecking checking;
         private final String user;
         private final String hostName;
         private final int port;
         private boolean modified;
 
         /** known_hosts 파일과 호스트 키 정책을 보관한다. */
-        private HostKeyVerifier(SshHostObject host, Path knownHosts, HostKeyChecking checking) {
+        private HostKeyVerifier(SshHostObject host, Path knownHosts, SshHostObject.HostKeyChecking checking) {
             super((session, remote, key) -> true, knownHosts);
             this.checking = checking;
             this.user = host.user();
@@ -276,7 +265,7 @@ public class SshConnection implements AutoCloseable {
         @Override
         protected boolean acceptUnknownHostKey(
                 ClientSession clientSession, SocketAddress remoteAddress, PublicKey serverKey) {
-            if (checking == HostKeyChecking.ACCEPT_NEW) {
+            if (checking == SshHostObject.HostKeyChecking.ACCEPT_NEW) {
                 return super.acceptUnknownHostKey(clientSession, remoteAddress, serverKey);
             }
             return false;
