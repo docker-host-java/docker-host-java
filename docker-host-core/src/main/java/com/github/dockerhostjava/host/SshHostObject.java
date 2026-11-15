@@ -142,6 +142,16 @@ public class SshHostObject implements DockerHost {
         return port;
     }
 
+    /** 저장된 비밀키 파일 경로를 반환한다. */
+    public Path keyFilePath() {
+        return keyFilePath;
+    }
+
+    /** 저장된 로그인 비밀번호 배열(원본 참조)을 반환한다. */
+    public char[] password() {
+        return password;
+    }
+
     /** 연결이 없으면 후보를 붙이고, 있으면 기존 연결을 반환한다. */
     public SshConnection open(SshConnection candidate) {
         synchronized (connectionLock) {
