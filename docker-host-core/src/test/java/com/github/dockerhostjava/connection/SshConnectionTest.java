@@ -1,5 +1,6 @@
 package com.github.dockerhostjava.connection;
 
+import com.github.dockerhostjava.connection.SshConnection.SshConnection;
 import com.github.dockerhostjava.host.SshHostObject;
 import org.apache.sshd.common.config.keys.KeyUtils;
 import org.apache.sshd.common.config.keys.writer.openssh.OpenSSHKeyEncryptionContext;
@@ -42,11 +43,13 @@ class SshConnectionTest {
             SshHostObject host = new SshHostObject()
                     .user("dkk")
                     .host("127.0.0.1")
-                    .port(server.getPort());
-            try (SshConnection connection = new SshConnection().auth(SshConnection.Auth.KEY_FILE).keyFilePath(key).connect(host)) {
-                assertSame(connection, host.connection());
+                    .port(server.getPort())
+                    .auth(SshHostObject.Auth.KEY_FILE)
+                    .keyFilePath(key);
+            host.connect();
+            try (SshConnection connection = host.connection()) {
                 assertTrue(connection.connected());
-                assertEquals(key, connection.keyFilePath());
+                assertEquals(key, host.keyFilePath());
                 assertEquals("dkk", host.user());
                 assertEquals("127.0.0.1", host.host());
                 assertEquals(server.getPort(), host.port());
@@ -56,16 +59,17 @@ class SshConnectionTest {
 
     @Test
     void portDefaultsTo22AndPasswordIsCopied() {
+        char[] password = "pw".toCharArray();
         SshHostObject host = new SshHostObject()
                 .user("dkk")
-                .host("127.0.0.1");
-        char[] password = "pw".toCharArray();
-        SshConnection connection = new SshConnection().auth(SshConnection.Auth.PASSWORD).password(password);
+                .host("127.0.0.1")
+                .auth(SshHostObject.Auth.PASSWORD)
+                .password(password);
 
         assertEquals(22, host.port());
-        assertNotSame(password, connection.password());
+        assertNotSame(password, host.password());
         Arrays.fill(password, '\0');
-        assertArrayEquals("pw".toCharArray(), connection.password());
+        assertArrayEquals("pw".toCharArray(), host.password());
     }
 
     @Test
@@ -74,10 +78,11 @@ class SshConnectionTest {
             SshHostObject host = new SshHostObject()
                     .user("dkk")
                     .host("127.0.0.1")
-                    .port(server.getPort());
-            try (SshConnection connection = new SshConnection()
-                    .auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray())
-                    .connect(host)) {
+                    .port(server.getPort())
+                    .auth(SshHostObject.Auth.PASSWORD)
+                    .password("pw".toCharArray());
+            host.connect();
+            try (SshConnection connection = host.connection()) {
                 assertTrue(connection.connected());
             }
         }
@@ -91,11 +96,12 @@ class SshConnectionTest {
             SshHostObject host = new SshHostObject()
                     .user("dkk")
                     .host("127.0.0.1")
-                    .port(server.getPort());
-            try (SshConnection connection = new SshConnection()
-                    .auth(SshConnection.Auth.KEY_FILE).keyFilePath(key)
-                    .passphrase("key-secret".toCharArray())
-                    .connect(host)) {
+                    .port(server.getPort())
+                    .auth(SshHostObject.Auth.KEY_FILE)
+                    .keyFilePath(key)
+                    .passphrase("key-secret".toCharArray());
+            host.connect();
+            try (SshConnection connection = host.connection()) {
                 assertTrue(connection.connected());
             }
         }
@@ -106,11 +112,11 @@ class SshConnectionTest {
         Path key = temp.resolve("key.pem");
         Files.writeString(key, "secret-bytes");
         char[] password = "s3cret-value".toCharArray();
-        IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshConnection()
-                .auth(SshConnection.Auth.KEY_FILE)
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> host()
+                .auth(SshHostObject.Auth.KEY_FILE)
                 .keyFilePath(key)
                 .password(password)
-                .connect(host()));
+                .connect());
 
         assertTrue(error.getMessage().contains("ssh password is set for key file auth"));
         assertFalse(error.getMessage().contains("s3cret-value"));
@@ -119,19 +125,20 @@ class SshConnectionTest {
 
     @Test
     void connectFailsWhenPassphraseIsSetWithoutIdentity() {
-        IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshConnection()
-                .auth(SshConnection.Auth.KEY_FILE)
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> host()
+                .auth(SshHostObject.Auth.KEY_FILE)
                 .passphrase("key-secret".toCharArray())
-                .connect(host()));
+                .connect());
         assertEquals("ssh passphrase requires a key file", error.getMessage());
     }
 
     @Test
     void connectFailsWhenEncryptedIdentityHasNoPassphrase() throws Exception {
         Path key = writeKey("key.pem", keyPair(), "key-secret");
-        IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshConnection()
-                .auth(SshConnection.Auth.KEY_FILE).keyFilePath(key)
-                .connect(host()));
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> host()
+                .auth(SshHostObject.Auth.KEY_FILE)
+                .keyFilePath(key)
+                .connect());
         assertTrue(error.getMessage().contains("ssh key file passphrase is missing: path=" + key));
         assertFalse(error.getMessage().contains("key-secret"));
     }
@@ -140,16 +147,17 @@ class SshConnectionTest {
     void connectFailsWhenAuthIsMissing() {
         IllegalStateException error = assertThrows(
                 IllegalStateException.class,
-                () -> new SshConnection().connect(host()));
+                () -> host().connect());
         assertTrue(error.getMessage().contains("ssh auth method is missing: password or key file"));
     }
 
     @Test
     void connectFailsWhenIdentityFileIsMissing() {
         Path missing = temp.resolve("missing.pem");
-        IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshConnection()
-                .auth(SshConnection.Auth.KEY_FILE).keyFilePath(missing)
-                .connect(host()));
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> host()
+                .auth(SshHostObject.Auth.KEY_FILE)
+                .keyFilePath(missing)
+                .connect());
         assertTrue(error.getMessage().contains("ssh key file is missing: path=" + missing));
     }
 
@@ -157,10 +165,12 @@ class SshConnectionTest {
     void connectFailsWhenUserIsBlank() {
         SshHostObject host = new SshHostObject()
                 .user(" ")
-                .host("127.0.0.1");
+                .host("127.0.0.1")
+                .auth(SshHostObject.Auth.PASSWORD)
+                .password("pw".toCharArray());
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,
-                () -> new SshConnection().auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray()).connect(host));
+                host::connect);
         assertTrue(error.getMessage().contains("ssh address is incomplete"));
     }
 
@@ -168,29 +178,36 @@ class SshConnectionTest {
     void connectFailsWhenHostIsBlank() {
         SshHostObject host = new SshHostObject()
                 .user("dkk")
-                .host("");
+                .host("")
+                .auth(SshHostObject.Auth.PASSWORD)
+                .password("pw".toCharArray());
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,
-                () -> new SshConnection().auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray()).connect(host));
+                host::connect);
         assertTrue(error.getMessage().contains("ssh address is incomplete"));
     }
 
     @Test
     void connectFailsWhenPasswordIsEmpty() {
-        IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshConnection()
-                .auth(SshConnection.Auth.PASSWORD).password(new char[0])
-                .connect(host()));
+        IllegalStateException error = assertThrows(IllegalStateException.class, () -> host()
+                .auth(SshHostObject.Auth.PASSWORD)
+                .password(new char[0])
+                .connect());
         assertEquals("ssh password is empty", error.getMessage());
     }
 
     @Test
     void connectFailsWhenPortIsOutOfRange() {
-        assertThrows(IllegalArgumentException.class, () -> new SshConnection()
-                .auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray())
-                .connect(host().port(0)));
-        assertThrows(IllegalArgumentException.class, () -> new SshConnection()
-                .auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray())
-                .connect(host().port(65536)));
+        assertThrows(IllegalArgumentException.class, () -> host()
+                .port(0)
+                .auth(SshHostObject.Auth.PASSWORD)
+                .password("pw".toCharArray())
+                .connect());
+        assertThrows(IllegalArgumentException.class, () -> host()
+                .port(65536)
+                .auth(SshHostObject.Auth.PASSWORD)
+                .password("pw".toCharArray())
+                .connect());
     }
 
     @Test
@@ -199,10 +216,10 @@ class SshConnectionTest {
             SshHostObject host = new SshHostObject()
                     .user("dkk")
                     .host("127.0.0.1")
-                    .port(server.getPort());
-            IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshConnection()
-                    .auth(SshConnection.Auth.PASSWORD).password("s3cret-value".toCharArray())
-                    .connect(host));
+                    .port(server.getPort())
+                    .auth(SshHostObject.Auth.PASSWORD)
+                    .password("s3cret-value".toCharArray());
+            IllegalStateException error = assertThrows(IllegalStateException.class, host::connect);
             assertTrue(error.getMessage().contains("ssh auth failed"));
             assertTrue(error.getMessage().contains("auth=password"));
             assertFalse(error.getMessage().contains("s3cret-value"));
@@ -217,10 +234,10 @@ class SshConnectionTest {
             SshHostObject host = new SshHostObject()
                     .user("dkk")
                     .host("127.0.0.1")
-                    .port(server.getPort());
-            IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshConnection()
-                    .auth(SshConnection.Auth.KEY_FILE).keyFilePath(key)
-                    .connect(host));
+                    .port(server.getPort())
+                    .auth(SshHostObject.Auth.KEY_FILE)
+                    .keyFilePath(key);
+            IllegalStateException error = assertThrows(IllegalStateException.class, host::connect);
             assertTrue(error.getMessage().contains("auth=keyFile"));
             assertFalse(error.getMessage().contains("secret-bytes"));
             assertNull(host.connection());
@@ -234,11 +251,12 @@ class SshConnectionTest {
             SshHostObject host = new SshHostObject()
                     .user("dkk")
                     .host("127.0.0.1")
-                    .port(server.getPort());
-            try (SshConnection first = new SshConnection()
-                    .auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray())
-                    .knownHosts(known)
-                    .connect(host)) {
+                    .port(server.getPort())
+                    .auth(SshHostObject.Auth.PASSWORD)
+                    .password("pw".toCharArray())
+                    .knownHosts(known);
+            host.connect();
+            try (SshConnection first = host.connection()) {
                 assertTrue(first.connected());
             }
             assertTrue(Files.size(known) > 0);
@@ -246,12 +264,13 @@ class SshConnectionTest {
             SshHostObject again = new SshHostObject()
                     .user("dkk")
                     .host("127.0.0.1")
-                    .port(server.getPort());
-            try (SshConnection second = new SshConnection()
-                    .auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray())
+                    .port(server.getPort())
+                    .auth(SshHostObject.Auth.PASSWORD)
+                    .password("pw".toCharArray())
                     .knownHosts(known)
-                    .hostKeyChecking(SshConnection.HostKeyChecking.ASK)
-                    .connect(again)) {
+                    .hostKeyChecking(SshHostObject.HostKeyChecking.ASK);
+            again.connect();
+            try (SshConnection second = again.connection()) {
                 assertTrue(second.connected());
             }
         }
@@ -261,14 +280,15 @@ class SshConnectionTest {
     void askRejectsAnUnknownHostKey() throws Exception {
         Path known = temp.resolve("known_hosts");
         try (SshServer server = server(0, null)) {
-            IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshConnection()
-                    .auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray())
+            IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshHostObject()
+                    .user("dkk")
+                    .host("127.0.0.1")
+                    .port(server.getPort())
+                    .auth(SshHostObject.Auth.PASSWORD)
+                    .password("pw".toCharArray())
                     .knownHosts(known)
-                    .hostKeyChecking(SshConnection.HostKeyChecking.ASK)
-                    .connect(new SshHostObject()
-                            .user("dkk")
-                            .host("127.0.0.1")
-                            .port(server.getPort())));
+                    .hostKeyChecking(SshHostObject.HostKeyChecking.ASK)
+                    .connect());
             assertTrue(error.getMessage().contains("ssh host key confirmation is required"));
             assertTrue(error.getMessage().contains("checking=ASK"));
             assertFalse(error.getMessage().contains("pw"));
@@ -279,14 +299,15 @@ class SshConnectionTest {
     @Test
     void yesRejectsAnUnknownHostKey() throws Exception {
         try (SshServer server = server(0, null)) {
-            IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshConnection()
-                    .auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray())
+            IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshHostObject()
+                    .user("dkk")
+                    .host("127.0.0.1")
+                    .port(server.getPort())
+                    .auth(SshHostObject.Auth.PASSWORD)
+                    .password("pw".toCharArray())
                     .knownHosts(temp.resolve("known_hosts"))
-                    .hostKeyChecking(SshConnection.HostKeyChecking.YES)
-                    .connect(new SshHostObject()
-                            .user("dkk")
-                            .host("127.0.0.1")
-                            .port(server.getPort())));
+                    .hostKeyChecking(SshHostObject.HostKeyChecking.YES)
+                    .connect());
             assertTrue(error.getMessage().contains("ssh host key was rejected"));
             assertTrue(error.getMessage().contains("checking=YES"));
         }
@@ -298,39 +319,53 @@ class SshConnectionTest {
         int port;
         try (SshServer first = server(0, null)) {
             port = first.getPort();
-            try (SshConnection connection = new SshConnection()
-                    .auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray())
-                    .knownHosts(known)
-                    .connect(new SshHostObject().user("dkk").host("127.0.0.1").port(port))) {
+            SshHostObject host = new SshHostObject()
+                    .user("dkk")
+                    .host("127.0.0.1")
+                    .port(port)
+                    .auth(SshHostObject.Auth.PASSWORD)
+                    .password("pw".toCharArray())
+                    .knownHosts(known);
+            host.connect();
+            try (SshConnection connection = host.connection()) {
                 assertTrue(connection.connected());
             }
         }
         try (SshServer second = server(port, null)) {
-            IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshConnection()
-                    .auth(SshConnection.Auth.PASSWORD).password("pw".toCharArray())
+            IllegalStateException error = assertThrows(IllegalStateException.class, () -> new SshHostObject()
+                    .user("dkk")
+                    .host("127.0.0.1")
+                    .port(port)
+                    .auth(SshHostObject.Auth.PASSWORD)
+                    .password("pw".toCharArray())
                     .knownHosts(known)
-                    .connect(new SshHostObject().user("dkk").host("127.0.0.1").port(port)));
+                    .connect());
             assertTrue(error.getMessage().contains("ssh host key was rejected"));
             assertTrue(error.getMessage().contains("checking=ACCEPT_NEW"));
         }
     }
 
     @Test
-    void makeConnectionReusesSameHostAndPort() throws Exception {
+    void reconnectReusesSameHostAndPort() throws Exception {
         KeyPair keyPair = keyPair();
         Path key = writeKey("key.pem", keyPair, null);
-        SshHostObject host = new SshHostObject().user("dkk").host("127.0.0.1");
         try (SshServer first = server(0, keyPair.getPublic())) {
-            host.port(first.getPort());
-            SshConnection connected = new SshConnection().auth(SshConnection.Auth.KEY_FILE).keyFilePath(key).connect(host);
+            SshHostObject host = new SshHostObject()
+                    .user("dkk")
+                    .host("127.0.0.1")
+                    .port(first.getPort())
+                    .auth(SshHostObject.Auth.KEY_FILE)
+                    .keyFilePath(key);
+            host.connect();
+            SshConnection connected = host.connection();
             try {
-                assertSame(connected, host.makeConnection("127.0.0.1", first.getPort()).orElseThrow());
+                assertSame(connected, host.reconnect("127.0.0.1", first.getPort()).orElseThrow());
                 try (SshServer second = server(0, keyPair.getPublic())) {
-                    SshConnection moved = host.makeConnection("127.0.0.1", second.getPort()).orElseThrow();
+                    SshConnection moved = host.reconnect("127.0.0.1", second.getPort()).orElseThrow();
                     assertNotSame(connected, moved);
                     assertTrue(moved.connected());
                     assertEquals("dkk", host.user());
-                    assertEquals(key, moved.keyFilePath());
+                    assertEquals(key, host.keyFilePath());
                     assertEquals(second.getPort(), host.port());
                 }
             } finally {

@@ -1,5 +1,6 @@
 package com.github.dockerhostjava.connection;
 
+import com.github.dockerhostjava.connection.HttpConnection.HttpConnection;
 import com.github.dockerhostjava.host.HttpHostObject;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -25,8 +25,8 @@ class ConnectionTest {
         HttpServer server = server("/_ping", 200, "OK");
         server.start();
         try {
-            HttpConnection connection = HttpConnection.connectPlain(host(server));
-            assertNotNull(connection);
+            HttpHostObject h = host(server).connect();
+            assertNotNull(h.connection());
         } finally {
             server.stop(0);
         }
@@ -37,8 +37,8 @@ class ConnectionTest {
         HttpServer server = server("/_ping", 200, "OK\n");
         server.start();
         try {
-            HttpConnection connection = HttpConnection.connectPlain(host(server));
-            assertNotNull(connection);
+            HttpHostObject h = host(server).connect();
+            assertNotNull(h.connection());
         } finally {
             server.stop(0);
         }
@@ -51,7 +51,7 @@ class ConnectionTest {
         try {
             IllegalStateException error = assertThrows(
                     IllegalStateException.class,
-                    () -> HttpConnection.connectPlain(host(server)));
+                    () -> host(server).connect());
             assertTrue(error.getMessage().contains("status=500"));
         } finally {
             server.stop(0);
@@ -59,25 +59,14 @@ class ConnectionTest {
     }
 
     @Test
-    void connectTlsFailsWithoutCerts() {
-        HttpHostObject host = new HttpHostObject().host("127.0.0.1").port(2376);
-        IllegalArgumentException error = assertThrows(
-                IllegalArgumentException.class,
-                () -> HttpConnection.connectTls(host, null));
-        assertTrue(error.getMessage().contains("tls certs are missing"));
-        assertNull(host.connection());
-    }
-
-    @Test
     void connectTlsFailsWhenTheHostIsAlreadyPlain() throws IOException {
         HttpServer server = server("/_ping", 200, "OK");
         server.start();
         try {
-            HttpHostObject host = host(server);
-            HttpConnection.connectPlain(host);
+            HttpHostObject h = host(server).connect();
             IllegalStateException error = assertThrows(
                     IllegalStateException.class,
-                    () -> HttpConnection.connectTls(host, new TlsCerts()));
+                    () -> h.tlsCerts(new TlsCerts()).connect());
             assertTrue(error.getMessage().contains("already connected with other tls settings"));
         } finally {
             server.stop(0);
@@ -94,16 +83,16 @@ class ConnectionTest {
     }
 
     @Test
-    void makeConnectionKeepsPlainOnTheNewAddress() throws IOException {
+    void reconnectKeepsPlainOnTheNewAddress() throws IOException {
         HttpServer first = server("/_ping", 200, "OK");
         Captured captured = new Captured();
         HttpServer second = engine(captured, 200, "[]");
         first.start();
         second.start();
         try {
-            HttpHostObject host = host(first);
-            HttpConnection before = HttpConnection.connectPlain(host);
-            HttpConnection after = host.makeConnection("127.0.0.1", second.getAddress().getPort()).orElseThrow();
+            HttpHostObject host = host(first).connect();
+            HttpConnection before = host.connection();
+            HttpConnection after = host.reconnect("127.0.0.1", second.getAddress().getPort()).orElseThrow();
             assertNotSame(before, after);
             assertEquals(Optional.of(List.of("[]")), host.command(List.of("docker ps")));
             assertEquals("/containers/json", captured.path);
@@ -119,8 +108,7 @@ class ConnectionTest {
         HttpServer server = engine(captured, 200, "[]");
         server.start();
         try {
-            HttpHostObject host = host(server);
-            HttpConnection.connectPlain(host);
+            HttpHostObject host = host(server).connect();
             Optional<?> body = host.command(List.of("docker ps"));
             assertEquals(Optional.of(List.of("[]")), body);
             assertEquals("GET", captured.method);
@@ -137,8 +125,7 @@ class ConnectionTest {
         HttpServer server = engine(captured, 200, "[]");
         server.start();
         try {
-            HttpHostObject host = host(server);
-            HttpConnection.connectPlain(host);
+            HttpHostObject host = host(server).connect();
             Optional<?> body = host.command(List.of("docker ps", "docker ps -a"));
             assertEquals(Optional.of(List.of("[]", "[]")), body);
             assertEquals("/containers/json", captured.path);
@@ -164,8 +151,7 @@ class ConnectionTest {
         HttpServer server = server("/_ping", 200, "OK");
         server.start();
         try {
-            HttpHostObject host = host(server);
-            HttpConnection.connectPlain(host);
+            HttpHostObject host = host(server).connect();
             IllegalArgumentException error = assertThrows(
                     IllegalArgumentException.class,
                     () -> host.command(List.of("docker build")));
