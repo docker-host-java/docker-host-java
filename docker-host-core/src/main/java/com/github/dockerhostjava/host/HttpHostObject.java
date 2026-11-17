@@ -1,6 +1,6 @@
 package com.github.dockerhostjava.host;
 
-import com.github.dockerhostjava.connection.HttpConnection;
+import com.github.dockerhostjava.connection.HttpConnection.HttpConnection;
 import com.github.dockerhostjava.connection.TlsCerts;
 import com.github.dockerhostjava.models.host.DockerHost;
 import com.github.dockerhostjava.models.http.HttpRequest;

@@ -1,5 +1,6 @@
 package com.github.dockerhostjava.connection;
 
+import com.github.dockerhostjava.connection.SshConnection.SshConnection;
 import com.github.dockerhostjava.host.SshHostObject;
 import org.apache.sshd.common.config.keys.KeyUtils;
 import org.apache.sshd.common.config.keys.writer.openssh.OpenSSHKeyEncryptionContext;

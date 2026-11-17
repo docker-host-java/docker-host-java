@@ -1,5 +1,6 @@
 package com.github.dockerhostjava.connection;
 
+import com.github.dockerhostjava.connection.HttpConnection.HttpConnection;
 import com.github.dockerhostjava.host.HttpHostObject;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;

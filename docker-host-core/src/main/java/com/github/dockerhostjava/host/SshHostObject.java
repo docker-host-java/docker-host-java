@@ -1,6 +1,6 @@
 package com.github.dockerhostjava.host;
 
-import com.github.dockerhostjava.connection.SshConnection;
+import com.github.dockerhostjava.connection.SshConnection.SshConnection;
 import com.github.dockerhostjava.models.host.DockerHost;
 import com.github.dockerhostjava.models.http.HttpRequest;
 

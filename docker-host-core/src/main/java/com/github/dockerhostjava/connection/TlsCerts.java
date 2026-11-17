@@ -44,22 +44,22 @@ public class TlsCerts {
     }
 
     /** 저장된 CA 인증서 경로를 반환한다. */
-    Path caPem() {
+    public Path caPem() {
         return caPem;
     }
 
     /** 저장된 클라이언트 인증서 경로를 반환한다. */
-    Path certPem() {
+    public Path certPem() {
         return certPem;
     }
 
     /** 저장된 클라이언트 비밀키 경로를 반환한다. */
-    Path keyPem() {
+    public Path keyPem() {
         return keyPem;
     }
 
     /** CA, 인증서, 비밀키로 SSLContext를 만든다. */
-    SSLContext sslContext() {
+    public SSLContext sslContext() {
         validateFile(caPem, "ca.pem");
         validateFile(certPem, "cert.pem");
         validateFile(keyPem, "key.pem");
